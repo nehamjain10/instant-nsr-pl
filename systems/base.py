@@ -4,8 +4,8 @@ import models
 from systems.utils import parse_optimizer, parse_scheduler, update_module_step
 from utils.mixins import SaverMixin
 from utils.misc import config_to_primitive, get_rank
-
-
+import torch
+import torch.nn as nn
 class BaseSystem(pl.LightningModule, SaverMixin):
     """
     Two ways to print to console:
@@ -18,6 +18,7 @@ class BaseSystem(pl.LightningModule, SaverMixin):
         self.rank = get_rank()
         self.prepare()
         self.model = models.make(self.config.model.name, self.config.model)
+        self.automatic_optimization = False
     
     def prepare(self):
         pass
@@ -116,13 +117,20 @@ class BaseSystem(pl.LightningModule, SaverMixin):
         raise NotImplementedError
 
     def configure_optimizers(self):
-        optim = parse_optimizer(self.config.system.optimizer, self.model)
-        ret = {
-            'optimizer': optim,
-        }
-        if 'scheduler' in self.config.system:
-            ret.update({
-                'lr_scheduler': parse_scheduler(self.config.system.scheduler, optim),
-            })
-        return ret
+        lr_decay_gamma_per_stage = 1e-1
+        optim1 = parse_optimizer(self.config.system.optimizer, self.model)
+        #Assign some MLP as Relu Parameters
+        dummy_input = torch.randn(1, 3, 3, 3, device=self.device)
+        relu_parameters = torch.nn.parameter.Parameter(data=dummy_input, requires_grad=True)
+        self.current_stage_lr = 0.03
+        optim2 = torch.optim.Adam(
+            params=[{"params": relu_parameters, "lr": self.current_stage_lr}],
+            betas=(0.9, 0.999),
+        )
 
+        scheduler1 = parse_scheduler(self.config.system.scheduler, optim1) 
+        #print("Relu Parameters are:",count_parameters(self.model.vol_model.thre3d_repr))       
+        scheduler2 =  torch.optim.lr_scheduler.ExponentialLR(
+            optim2, gamma=lr_decay_gamma_per_stage
+        )
+        return [optim1, optim2], [scheduler1,scheduler2]
