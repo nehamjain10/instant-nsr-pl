@@ -125,7 +125,7 @@ def render(
     # assert (
     #     len(rays.origins.shape) == len(rays.directions.shape) == 2
     # ), f"Please note that the RENDER interface only works with FLAT RAYS!"
-    print("Sampled points shape: ", sampled_points.shape)
-    print("Rays shape: ", rays.shape)
+
+    
     raw_radiance,density = point_processor_fn(sampled_points, rays)
     return raw_radiance,density

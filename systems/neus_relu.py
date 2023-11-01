@@ -155,7 +155,7 @@ class NeuSReluSystem(BaseSystem):
 
         self.manual_backward(loss)
         optim1.step()
-        #optim2.step()
+        optim2.step()
 
         sch1,sch2 = self.lr_schedulers()
         sch1.step()

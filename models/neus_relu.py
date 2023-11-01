@@ -167,18 +167,35 @@ class NeuSModel(BaseModel):
         alpha = self.get_alpha(sdf, normal, t_dirs, dists)[...,None]
         density = torch.log(1-alpha+1e-5)/(-dists-1e-5)
         rgb = self.texture(feature, t_dirs, normal)
+        
+        # if self.training is False:
+        #     print("Shape of rays and sampled_points:", t_dirs.shape, positions.shape)
+        #     print("Shape of rgb and density:", rgb.shape, density.shape)
 
+        if t_dirs.shape[0] != 0:
+            rgb_smoke, sigmas_smoke = self.vol_model.render_rays(t_dirs,positions)
+        else:
+            rgb_smoke = torch.zeros((0,3), dtype=torch.float32, device=self.rank)
+            sigmas_smoke = torch.zeros((0,1), dtype=torch.float32, device=self.rank)
+
+        sigma_total = density + sigmas_smoke
         #weights = render_weight_from_alpha(alpha, ray_indices=ray_indices, n_rays=n_rays)
-        weights = render_weight_from_density(t_starts, t_ends, density, ray_indices=ray_indices, n_rays=n_rays)
+        #weights = render_weight_from_density(t_starts, t_ends, density, ray_indices=ray_indices, n_rays=n_rays)
+        weights = render_weight_from_density(t_starts, t_ends, sigma_total, ray_indices=ray_indices, n_rays=n_rays)
         opacity = accumulate_along_rays(weights, ray_indices, values=None, n_rays=n_rays)
         depth = accumulate_along_rays(weights, ray_indices, values=midpoints, n_rays=n_rays)
-        comp_rgb = accumulate_along_rays(weights, ray_indices, values=rgb, n_rays=n_rays)
+        
+        sigma_total += 1e-5
+
+        comp_rgb = accumulate_along_rays(weights*density/sigma_total, ray_indices, values=rgb, n_rays=n_rays)
+        comp_rgb_smoke = accumulate_along_rays(weights*sigmas_smoke/sigma_total, ray_indices, values=rgb_smoke, n_rays=n_rays)
 
         comp_normal = accumulate_along_rays(weights, ray_indices, values=normal, n_rays=n_rays)
         comp_normal = F.normalize(comp_normal, p=2, dim=-1)
 
+        total_rgb = comp_rgb + comp_rgb_smoke
         out = {
-            'comp_rgb': comp_rgb,
+            'comp_rgb': total_rgb,
             'comp_normal': comp_normal,
             'opacity': opacity,
             'depth': depth,
