@@ -119,9 +119,7 @@ class BaseSystem(pl.LightningModule, SaverMixin):
     def configure_optimizers(self):
         lr_decay_gamma_per_stage = 1e-1
         optim1 = parse_optimizer(self.config.system.optimizer, self.model)
-        #Assign some MLP as Relu Parameters
-        dummy_input = torch.randn(1, 3, 3, 3, device=self.device)
-        relu_parameters = torch.nn.parameter.Parameter(data=dummy_input, requires_grad=True)
+        relu_parameters = self.model.vol_model.thre3d_repr.parameters()
         self.current_stage_lr = 0.03
         optim2 = torch.optim.Adam(
             params=[{"params": relu_parameters, "lr": self.current_stage_lr}],

@@ -102,7 +102,7 @@ def main():
         accelerator='gpu',
         callbacks=callbacks,
         logger=loggers,
-        strategy=strategy,
+        strategy="ddp",
         **config.trainer
     )
 

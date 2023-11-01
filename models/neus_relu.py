@@ -10,7 +10,8 @@ from models.utils import chunk_batch
 from systems.utils import update_module_step
 from nerfacc import ContractionType, OccupancyGrid, ray_marching, render_weight_from_density, render_weight_from_alpha, accumulate_along_rays
 from nerfacc.intersection import ray_aabb_intersect
-
+from easydict import EasyDict as edict
+from simplejson import load
 
 class VarianceNetwork(nn.Module):
     def __init__(self, config):
@@ -67,7 +68,11 @@ class NeuSModel(BaseModel):
         self.randomized = self.config.randomized
         self.background_color = None
         self.render_step_size = 1.732 * 2 * self.config.radius / self.config.num_samples_per_ray
-    
+        with open("args_relu.json", 'r') as f:
+            args_relu = edict(load(f))
+        self.relu_fields = models.make("relu_fields", args_relu)
+        self.vol_model = self.relu_fields.vox_grid_vol_mod
+
     def update_step(self, epoch, global_step):
         update_module_step(self.geometry, epoch, global_step)
         update_module_step(self.texture, epoch, global_step)
